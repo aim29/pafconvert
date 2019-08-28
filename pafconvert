@@ -83,6 +83,7 @@ UPDATE paf SET
 	double_dependent_locality = NULLIF(double_dependent_locality, ''),
 	thoroughfare = NULLIF(thoroughfare, ''),
 	dependent_thoroughfare = NULLIF(dependent_thoroughfare, ''),
+	building_number = NULLIF(building_number, ' '),
 	building_name = NULLIF(building_name, ''),
 	sub_building_name = NULLIF(sub_building_name, ''),
 	po_box = NULLIF(po_box, ''),
