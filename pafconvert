@@ -1,0 +1,148 @@
+.print Preparing database...
+
+.shell del PAF.sql
+.shell rm PAF.sql
+
+DROP TABLE IF EXISTS "paf";
+
+CREATE TABLE "paf" (
+	"postcode"	varchar(8) NOT NULL,
+	"post_town"	varchar(30) NOT NULL,
+	"dependent_locality"	varchar(35),
+	"double_dependent_locality"	varchar(35),
+	"thoroughfare"	varchar(80),
+	"dependent_thoroughfare"	varchar(80),
+	"building_number"	int,
+	"building_name"	varchar(50),
+	"sub_building_name"	varchar(30),
+	"po_box"	varchar(6),
+	"department_name"	varchar(60),
+	"organisation_name"	varchar(60),
+	"udprn"	int NOT NULL,
+	"postcode_type"	varchar(1),
+	"su_organisation_indicator"	varchar(1),
+	"delivery_point_suffix"	varchar(2),
+	"Field17"	varchar(255),
+	"Field18"	varchar(255),
+	"Field19"	varchar(255),
+	"Field20"	varchar(255),
+	PRIMARY KEY("udprn")
+);
+CREATE TABLE IF NOT EXISTS "addresses" (
+	"id"	int NOT NULL,
+	"postcode"	varchar(8) NOT NULL,
+	"locality_id"	int NOT NULL,
+	"thoroughfare_id"	int,
+	"dependent_thoroughfare_id"	int,
+	"building_number"	int,
+	"building_name"	varchar(50),
+	"sub_building_name"	varchar(30),
+	"po_box"	varchar(6),
+	"department_name"	varchar(60),
+	"organisation_name"	varchar(60),
+	PRIMARY KEY("id")
+);
+CREATE TABLE IF NOT EXISTS "thoroughfares" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	"thoroughfare"	varchar(80) NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "localities" (
+	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"post_town"	varchar(30),
+	"dependent_locality"	varchar(35),
+	"double_dependent_locality"	varchar(35)
+);
+CREATE INDEX IF NOT EXISTS "idx_addresses_locality_dependent_thoroughfare" ON "addresses" (
+	"locality_id",
+	"dependent_thoroughfare_id"
+);
+CREATE INDEX IF NOT EXISTS "idx_addresses_locality_thoroughfare" ON "addresses" (
+	"locality_id",
+	"thoroughfare_id"
+);
+CREATE INDEX IF NOT EXISTS "idx_addresses_postcode" ON "addresses" (
+	"postcode"
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_thoroughfares" ON "thoroughfares" (
+	"thoroughfare"
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_localities" ON "localities" (
+	"post_town",
+	"dependent_locality",
+	"double_dependent_locality"
+);
+
+.print Importing PAF CSV...
+.mode csv
+.import "CSV PAF.csv" paf
+
+.print Converting PAF CSV data...
+.print - Step 1/4: Convert blank values to NULLS
+UPDATE paf SET
+	dependent_locality = NULLIF(dependent_locality, ''),
+	double_dependent_locality = NULLIF(double_dependent_locality, ''),
+	thoroughfare = NULLIF(thoroughfare, ''),
+	dependent_thoroughfare = NULLIF(dependent_thoroughfare, ''),
+	building_name = NULLIF(building_name, ''),
+	sub_building_name = NULLIF(sub_building_name, ''),
+	po_box = NULLIF(po_box, ''),
+	department_name = NULLIF(department_name, ''),
+	organisation_name = NULLIF(organisation_name, '');
+
+.print - Step 2/4: Create locality records
+INSERT OR IGNORE INTO localities (post_town, dependent_locality, double_dependent_locality) SELECT DISTINCT post_town, dependent_locality, double_dependent_locality FROM paf;
+
+.print - Step 3/4: Convert thoroughfare records
+INSERT OR IGNORE INTO thoroughfares (thoroughfare) SELECT DISTINCT thoroughfare FROM paf WHERE thoroughfare IS NOT NULL;
+INSERT OR IGNORE INTO thoroughfares (thoroughfare) SELECT DISTINCT dependent_thoroughfare FROM paf WHERE dependent_thoroughfare IS NOT NULL;
+
+.print - Step 4/4: Convert address records
+INSERT OR REPLACE INTO addresses
+	SELECT
+		p.udprn AS id,
+		p.postcode,
+		l.id AS locality_id,
+		t.id AS thoroughfare_id,
+		dt.id AS dependent_thoroughfare_id,
+		p.building_number,
+		p.building_name,
+		p.sub_building_name,
+		p.po_box,
+		p.department_name,
+		p.organisation_name
+	FROM paf p
+		LEFT JOIN localities l ON (
+			p.post_town IS l.post_town
+			AND p.dependent_locality IS l.dependent_locality
+			AND p.double_dependent_locality IS l.double_dependent_locality
+		)
+		LEFT JOIN thoroughfares t ON p.thoroughfare IS t.thoroughfare
+		LEFT JOIN thoroughfares dt ON p.dependent_thoroughfare IS dt.thoroughfare;
+
+.print Cleaning up...
+DROP TABLE paf;
+
+.print Exporting SQL...
+.output "PAF.sql"
+
+.mode insert paf.localities
+.print DELETE FROM paf.localities;
+
+SELECT * from localities;
+
+.mode insert paf.thoroughfares
+.print DELETE FROM paf.thoroughfares;
+
+SELECT * from thoroughfares;
+
+.mode insert paf.addresses
+.print DELETE FROM paf.addresses;
+
+SELECT * from addresses;
+
+.output
+.print Tidying SQL output...
+.shell sed -i \'s/"//g\' ./PAF.sql
+
+.print Done!
+.exit
