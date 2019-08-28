@@ -21,4 +21,4 @@ To run the tool, ensure that you have SQLite and a GNU-compatible sed installed 
 
 Note that the SQL database created by the tool will be very large; should you wish to keep it around for later use or for incremental changes I would suggest running a `VACUUM` on it.
 
-The tool is provided with no warranty of fitness for purpose and is released into the public domain.
+The tool is provided with no warranty of fitness for purpose and is released under the MIT Licence.
