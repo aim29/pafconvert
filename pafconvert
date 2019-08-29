@@ -77,7 +77,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "idx_localities" ON "localities" (
 .import "CSV PAF.csv" paf
 
 .print Converting PAF CSV data...
-.print - Step 1/4: Convert blank values to NULLS
+.print - Step 1/4: Convert blank values to NULLs
 UPDATE paf SET
 	dependent_locality = NULLIF(dependent_locality, ''),
 	double_dependent_locality = NULLIF(double_dependent_locality, ''),
@@ -93,11 +93,11 @@ UPDATE paf SET
 .print - Step 2/4: Create locality records
 INSERT OR IGNORE INTO localities (post_town, dependent_locality, double_dependent_locality) SELECT DISTINCT post_town, dependent_locality, double_dependent_locality FROM paf;
 
-.print - Step 3/4: Convert thoroughfare records
+.print - Step 3/4: Create thoroughfare records
 INSERT OR IGNORE INTO thoroughfares (thoroughfare) SELECT DISTINCT thoroughfare FROM paf WHERE thoroughfare IS NOT NULL;
 INSERT OR IGNORE INTO thoroughfares (thoroughfare) SELECT DISTINCT dependent_thoroughfare FROM paf WHERE dependent_thoroughfare IS NOT NULL;
 
-.print - Step 4/4: Convert address records
+.print - Step 4/4: Create address records
 INSERT OR REPLACE INTO addresses
 	SELECT
 		p.udprn AS id,
